@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'infra/**'
+      - '**.tf'
   pull_request:
     paths:
-      - 'infra/**'
+      - '**.tf'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
 
 defaults:
   run:
-    working-directory: infra   # change to '.' if your .tf files live at repo root
+    working-directory: .
 
 jobs:
   plan:
@@ -46,12 +46,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: infra/tfplan
+          path: tfplan
           retention-days: 1
 
   apply:
     needs: plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production   # requires manual approval if you configure a protection rule on this environment
     steps:
@@ -73,7 +73,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan
-          path: infra
+          path: .
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
