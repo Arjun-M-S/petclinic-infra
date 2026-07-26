@@ -2,6 +2,7 @@ terraform{
   #TESTESTESTESTESTESTEST
   #TWSTTEWTWADUEA
   # TESTETSTETSTET
+  # TESTETSTETST
     required_providers {
         aws = {
             source = "hashicorp/aws"
