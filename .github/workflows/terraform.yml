@@ -1,79 +1,72 @@
 name: terraform
-
 on:
   push:
     branches: [main]
     paths:
-      - 'infra/**'
+      - '**.tf'
   pull_request:
     paths:
-      - 'infra/**'
+      - '**.tf'
   workflow_dispatch:
-
 permissions:
   id-token: write   # required for OIDC
   contents: read
-
 defaults:
   run:
-    working-directory: infra   # change to '.' if your .tf files live at repo root
-
+    working-directory: .
 jobs:
   plan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug OIDC token
+        run: |
+          TOKEN=$(curl -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "$TOKEN" | cut -d '.' -f2 | base64 -d 2>/dev/null | jq .
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-2
-
+          role-skip-session-tagging: true
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
       - name: Terraform Init
         run: terraform init
-
       - name: Terraform Validate
         run: terraform validate
-
       - name: Terraform Plan
         run: terraform plan -out=tfplan
-
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: infra/tfplan
+          path: tfplan
           retention-days: 1
-
   apply:
     needs: plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production   # requires manual approval if you configure a protection rule on this environment
     steps:
       - uses: actions/checkout@v4
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-2
-
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
       - name: Terraform Init
         run: terraform init
-
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan
-          path: infra
-
+          path: .
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
