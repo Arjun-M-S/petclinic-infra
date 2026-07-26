@@ -2,11 +2,11 @@ terraform{
   #TESTESTESTESTESTESTEST
   #TWSTTEWTWADUEA
   # TESTETSTETSTET
-  # TESTETSTETSTs;ihf;aihsefjsrg
+  # TESTETSTETSTs;ihf;aihsefjsrg123
     required_providers {
         aws = {
             source = "hashicorp/aws"
-            version = "= 6.56.0" 
+            version = "6.56.0" 
         }
 
         random = {
