@@ -23,6 +23,14 @@ jobs:
           aws-region: ap-south-2
           role-skip-session-tagging: true
 
+      - name: Delete LoadBalancer services first
+        run: |
+          aws eks update-kubeconfig --name petclinic-eks-cluster --region ap-south-2
+          kubectl delete svc api-gateway -n default --ignore-not-found
+          kubectl delete svc argocd-server -n argocd --ignore-not-found
+          echo "Waiting for AWS to deprovision associated ELBs/security groups..."
+          sleep 90
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
