@@ -1,4 +1,5 @@
 name: terraform
+
 on:
   push:
     branches: [main]
@@ -8,15 +9,17 @@ on:
     paths:
       - '**.tf'
   workflow_dispatch:
+
 permissions:
   id-token: write   # required for OIDC
   contents: read
-defaults:
-  run:
-    working-directory: .
+
 jobs:
-  plan:
+  core-plan:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
     steps:
       - uses: actions/checkout@v4
 
@@ -30,43 +33,105 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-2
           role-skip-session-tagging: true
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
-      - name: Terraform Init
-        run: terraform init
-      - name: Terraform Validate
-        run: terraform validate
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform plan -out=tfplan
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: tfplan
-          path: tfplan
+          name: core-tfplan
+          path: core/tfplan
           retention-days: 1
-  apply:
-    needs: plan
+
+  core-apply:
+    needs: core-plan
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: production   # requires manual approval if you configure a protection rule on this environment
+    defaults:
+      run:
+        working-directory: core
     steps:
       - uses: actions/checkout@v4
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-2
+          role-skip-session-tagging: true
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
-      - name: Terraform Init
-        run: terraform init
-      - name: Download plan artifact
-        uses: actions/download-artifact@v4
+      - run: terraform init
+
+      - uses: actions/download-artifact@v4
         with:
-          name: tfplan
-          path: .
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+          name: core-tfplan
+          path: core
+
+      - run: terraform apply -auto-approve tfplan
+
+  addons-plan:
+    needs: core-apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: addons
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-2
+          role-skip-session-tagging: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - run: terraform init
+      - run: terraform plan -out=tfplan
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: addons-tfplan
+          path: addons/tfplan
+          retention-days: 1
+
+  addons-apply:
+    needs: addons-plan
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: addons
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-2
+          role-skip-session-tagging: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - run: terraform init
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: addons-tfplan
+          path: addons
+
+      - run: terraform apply -auto-approve tfplan
