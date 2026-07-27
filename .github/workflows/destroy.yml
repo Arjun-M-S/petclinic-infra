@@ -8,8 +8,12 @@ permissions:
   contents: read
 
 jobs:
-  destroy:
+  destroy-addons:
     runs-on: ubuntu-latest
+    environment: production   # manual approval gate — this is destructive
+    defaults:
+      run:
+        working-directory: addons
     steps:
       - uses: actions/checkout@v4
 
@@ -17,16 +21,36 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-2
+          role-skip-session-tagging: true
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5
 
-      - name: Terraform Init
-        run: terraform init
+      - run: terraform init
+      - run: terraform plan -destroy -out=destroy-plan
+      - run: terraform apply -auto-approve destroy-plan
 
-      - name: Terraform Plan Destroy
-        run: terraform plan -destroy -out=destroy-plan
+  destroy-core:
+    needs: destroy-addons
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Terraform Destroy
-        run: terraform apply -auto-approve destroy-plan
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-2
+          role-skip-session-tagging: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - run: terraform init
+      - run: terraform plan -destroy -out=destroy-plan
+      - run: terraform apply -auto-approve destroy-plan
