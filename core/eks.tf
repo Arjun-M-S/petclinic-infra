@@ -12,6 +12,17 @@ module "eks" {
   endpoint_public_access = true
   enable_cluster_creator_admin_permissions = true
 
+  addons = {
+    coredns                = {}
+    kube-proxy              = {}
+    vpc-cni                 = {
+      before_compute = true
+    }
+    eks-pod-identity-agent   = {
+      before_compute = true
+    }
+  }
+
   eks_managed_node_groups = {
     petclinic_nodes = {
         min_size = 1
